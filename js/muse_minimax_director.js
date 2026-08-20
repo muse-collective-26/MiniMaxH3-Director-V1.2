@@ -832,6 +832,54 @@ class MinimaxTimelineEditor {
     this._toggleReferenceBox();
   }
 
+  // Ported directly from the Combo/TwoStage node's own working V2 dashboard
+  // (already proven there, including having already hit and fixed the exact
+  // same "collapses into a tiny extremely tall column" failure this went
+  // through) rather than re-deriving node auto-sizing from scratch a fifth
+  // time. ResizeObserver — not getBoundingClientRect polling — is the actual
+  // fix: it fires on real layout changes to the container itself and isn't
+  // subject to whatever async delay ComfyUI's canvas-transform attachment has
+  // for getBoundingClientRect. offsetHeight/scrollHeight (not
+  // getBoundingClientRect) are layout-box measurements, unaffected by that
+  // same attachment timing.
+  _attachAutoResize(timelineWidget) {
+    this.timelineWidget = timelineWidget;
+    if (this._resizeObserver) this._resizeObserver.disconnect();
+    if (typeof ResizeObserver !== "undefined") {
+      this._resizeObserver = new ResizeObserver(() => this._scheduleNodeResize());
+      this._resizeObserver.observe(this.container);
+    }
+    this._scheduleNodeResize();
+  }
+
+  _scheduleNodeResize() {
+    if (!this.timelineWidget || !this.node?.setSize) return;
+    if (this._resizeFrame) cancelAnimationFrame(this._resizeFrame);
+    this._resizeFrame = requestAnimationFrame(() => {
+      // A second frame lets textarea drag-resizes and freshly rebuilt
+      // reference media settle before measuring.
+      this._resizeFrame = requestAnimationFrame(() => {
+        const contentHeight = Math.max(
+          this.container.offsetHeight || 0,
+          this.container.scrollHeight || 0,
+          640,
+        );
+        // Never derive from this.node.size[1] here — that's exactly the
+        // self-referential feedback loop that shipped and grew a real saved
+        // node to over 1.5 million pixels tall: computeSize feeding the
+        // node's own current height back into itself, compounding on every
+        // layout pass. contentHeight above is measured fresh from the DOM
+        // every time, never from the node's own prior size.
+        const width = Math.max(this.node.size?.[0] || 560, 560);
+        const height = Math.ceil(contentHeight + 70);
+        if (!this.node.size || Math.abs(this.node.size[1] - height) > 2 || this.node.size[0] !== width) {
+          this.node.setSize([width, height]);
+          this.node.setDirtyCanvas?.(true, true);
+        }
+      });
+    });
+  }
+
   // ── Boxed settings panel (re-skins the real native widgets) ────────────────
   _buildSettingsBoxes() {
     const row = document.createElement("div");
@@ -1392,7 +1440,6 @@ class MinimaxTimelineEditor {
     bounds.forEach((b, chunkIdx) => {
       this.chunksWrap.appendChild(this._buildChunkSection(chunkIdx, b[1] - b[0]));
     });
-    this._syncNodeHeight();
   }
 
   _buildChunkSection(chunkIdx, chunkDurSeconds) {
@@ -1820,25 +1867,6 @@ class MinimaxTimelineEditor {
         this.refsArea.appendChild(this._buildPromptGenSection(c));
       }
     }
-    this._syncNodeHeight();
-  }
-
-  // Explicitly re-applies the node's own height from the DOM editor's real
-  // content height plus a fixed 100px buffer below the lowest thing in it
-  // (reference audio, at the very bottom) — called at the end of
-  // renderTimeline/renderReferences (the two methods that actually change
-  // content height) rather than relying solely on LiteGraph's own computeSize
-  // callback, which doesn't reliably re-fire once a node's size has been set
-  // explicitly (e.g. by manually dragging its corner) — confirmed live: after
-  // a manual resize, adding/removing chunks stopped growing/shrinking the
-  // node at all. This forces it back in sync every time, so dragging the
-  // corner no longer permanently detaches the node from its own content.
-  _syncNodeHeight() {
-    const rect = this.container?.getBoundingClientRect();
-    if (!rect || rect.height <= 0) return;
-    const targetHeight = Math.min(Math.max(rect.height + 100, 200), 20000);
-    this.node.setSize([this.node.size[0], targetHeight]);
-    this.node.setDirtyCanvas(true, true);
   }
 
   // Continuation context for chunk N+1's Prompt Gen call. Prefers the previous
@@ -2985,35 +3013,21 @@ app.registerExtension({
         serialize: false,
         hideOnZoom: false,
       });
-      // Without this, a node's height just stays whatever was last saved
-      // (e.g. dragged taller once, or restored from an older workflow file)
-      // instead of tracking the actual content — confirmed live: manually
-      // shrinking the node fixes it, but nobody using this node should have
-      // to know that. getBoundingClientRect (not scrollHeight, which
-      // behaved unreliably here on an earlier attempt at this same fix)
-      // plus a hard clamp so a bad reading can never blow the node out to
-      // an absurd size the way that earlier attempt did. That clamp's upper
-      // bound was originally 2000 — too tight for a real multi-chunk timeline
-      // with several CUTs each (e.g. Whisper's "insert into cuts" on a longer
-      // song): confirmed directly, real content taller than 2000px got
-      // rendered past the node's own background, which stayed capped there,
-      // so it looked like the content was spilling off the bottom of the
-      // node. Raised generously (no realistic timeline should ever hit it)
-      // while keeping a finite upper bound so a genuinely bad reading (NaN,
-      // a mid-reflow glitch, etc.) still can't blow the node out unbounded.
-      // The +100 buffer matches _syncNodeHeight's own math (see that method)
-      // — the two are kept in agreement so they don't fight each other over
-      // the node's real height; _syncNodeHeight is the one that actually
-      // forces it after every content change (a manual corner-drag otherwise
-      // sticks and stops this computeSize callback from ever overriding it
-      // again on its own).
+      // Ported from the Combo/TwoStage node's own working dashboard — see
+      // _attachAutoResize/_scheduleNodeResize for the real, ResizeObserver-
+      // based mechanism that actually keeps the node in sync with its
+      // content. This computeSize is only LiteGraph's own fallback query;
+      // offsetHeight/scrollHeight (not getBoundingClientRect) since those are
+      // layout-box measurements, not subject to the async canvas-transform-
+      // attachment delay that caused every earlier attempt here to misread
+      // collapsed/transient sizes.
       timelineWidget.computeSize = (width) => {
-        const rect = this._museMinimaxEditor?.container?.getBoundingClientRect();
-        const h = rect && rect.height > 0 ? rect.height + 100 : 640;
-        return [width, Math.min(Math.max(h, 200), 20000)];
+        const container = this._museMinimaxEditor?.container;
+        const h = Math.max(container?.offsetHeight || 0, container?.scrollHeight || 0, 640);
+        return [Math.max(this.size?.[0] || width || 560, 560), h];
       };
+      this._museMinimaxEditor._attachAutoResize(timelineWidget);
 
-      this.size = [560, 640];
       return r;
     };
 
@@ -3031,7 +3045,18 @@ app.registerExtension({
       if (this._museMinimaxEditor) {
         this._museMinimaxEditor.timeline = this._museMinimaxEditor._loadState();
         this._museMinimaxEditor.build();
+        this._museMinimaxEditor._scheduleNodeResize();
       }
+      return r;
+    };
+
+    // Some ComfyUI builds recompute a node's dimensions after execution —
+    // re-run the real measurement afterward so the UI can't collapse when
+    // the queue finishes (ported from the same fix in the Combo node).
+    const onExecuted = nodeType.prototype.onExecuted;
+    nodeType.prototype.onExecuted = function () {
+      const r = onExecuted ? onExecuted.apply(this, arguments) : undefined;
+      this._museMinimaxEditor?._scheduleNodeResize();
       return r;
     };
   },
