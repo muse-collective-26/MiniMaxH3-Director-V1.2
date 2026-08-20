@@ -16,6 +16,9 @@ This repository bundles **two** ComfyUI nodes — Muse Minimax Director V1.2 and
 
 ## Changelog
 
+### v2.2.1
+- **Muse Model Route** is now bundled here too — a tiny utility node used by the example workflow to route the Reference or First/Last-Frame model into the Director's single `model` input depending on mode. It previously wasn't published anywhere, so anyone downloading the example workflow couldn't actually get it — that's fixed now.
+
 ### v2.2.0
 - **Muse Minimax Refine V1.2 is now bundled in this same repository** instead of living separately — one install gets you both nodes. See [Muse Minimax Refine (bundled)](#muse-minimax-refine-bundled) for what it does.
 - Refine's own module docstring was out of date (still described an older img2img-style pixel re-sample) — corrected to describe what the node actually does: a genuine latent-continuation Stage 2, picking up the candidate's own sigma schedule exactly where Stage 1 left off.
@@ -90,6 +93,7 @@ MiniMax H3 is a strong omni-modal model, but its native inputs are low-level: nu
 |------|---------------|-------------|
 | `MuseMinimaxDirectorV1_2` | Muse Minimax Director V1.2 (Two-Stage) | Timeline-based director for MiniMax H3 — chunking, prompt compilation, Seed Hunt scouting, continuity |
 | `MuseMinimaxRefineV1_2` | Muse Minimax Refine V1.2 (Latent, Two-Stage) | Companion second-pass node — continues a picked Seed Hunt candidate's own sigma schedule at a higher resolution (see [Muse Minimax Refine (bundled)](#muse-minimax-refine-bundled)) |
+| `MuseModelRoute` | Muse Model Route | Tiny utility — routes one MODEL input to exactly one of two outputs based on a boolean switch, the other forced to `None`. Used in the example workflow to send either the Reference or First/Last-Frame model into the Director's `model` input depending on mode. |
 
 ---
 
