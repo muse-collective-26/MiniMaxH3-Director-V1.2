@@ -4,7 +4,9 @@
 
 Built by [Muse Collective](https://musecollective.co.uk) — write a single flowing script broken into CUTs, drop in reference character images/video/audio, and let the node handle chunking, prompt-per-chunk splitting, and reference-tag numbering for you.
 
-This is a fork of [Muse Minimax Director](https://github.com/muse-collective-26/MiniMaxH3-Director) that adds a **Seed Hunt** toggle — scout 4 candidate seeds in one run at low resolution, then pick the best one and refine it at full resolution with the companion [Muse Minimax Refine](https://github.com/muse-collective-26/Muse-MiniMax-H3-Refine) node — plus two-stage sampling and a VAE re-encode continuity mode that eliminates the visible jump at chunk boundaries on multi-chunk renders (see [Changelog](#changelog) and [Chunk continuity, in detail](#chunk-continuity-in-detail)). The original repo stays as the simpler, single-generation version; this one is for anyone who wants the scouting workflow, longer multi-chunk renders, or both.
+This is a fork of [Muse Minimax Director](https://github.com/muse-collective-26/MiniMaxH3-Director) that adds independent per-candidate **Seed Hunt** toggles — scout up to 4 candidate seeds in one run at low resolution, then pick the best one and continue it at full resolution with the bundled [Muse Minimax Refine](#muse-minimax-refine-bundled) node — plus two-stage sampling and a VAE re-encode continuity mode that eliminates the visible jump at chunk boundaries on multi-chunk renders (see [Changelog](#changelog) and [Chunk continuity, in detail](#chunk-continuity-in-detail)). The original repo stays as the simpler, single-generation version; this one is for anyone who wants the scouting workflow, longer multi-chunk renders, or both.
+
+This repository bundles **two** ComfyUI nodes — Muse Minimax Director V1.2 and its companion Muse Minimax Refine V1.2 — installed together as one package. See [Muse Minimax Refine (bundled)](#muse-minimax-refine-bundled) below for what it does and how to wire it up.
 
 ![ComfyUI Custom Node](https://img.shields.io/badge/ComfyUI-Custom%20Node-orange?style=flat-square)
 ![MiniMax H3](https://img.shields.io/badge/MiniMax-H3-blue?style=flat-square)
@@ -14,9 +16,13 @@ This is a fork of [Muse Minimax Director](https://github.com/muse-collective-26/
 
 ## Changelog
 
+### v2.2.0
+- **Muse Minimax Refine V1.2 is now bundled in this same repository** instead of living separately — one install gets you both nodes. See [Muse Minimax Refine (bundled)](#muse-minimax-refine-bundled) for what it does.
+- Refine's own module docstring was out of date (still described an older img2img-style pixel re-sample) — corrected to describe what the node actually does: a genuine latent-continuation Stage 2, picking up the candidate's own sigma schedule exactly where Stage 1 left off.
+
 ### v2.1.0
 - **Seed Hunt: independent per-candidate toggles.** Replaces the old all-or-nothing Seed Hunt checkbox with three separate toggles — Candidate 2, Candidate 3, Candidate 4 (Sampling box) — so you can run exactly as many extra scouting passes as you actually want (1 through 4 total) instead of always paying for all 4. Candidate 1 always runs. Fully independent of Latent-Only Scouting — combine them however you like.
-- **Latent-Only Scouting now works correctly on multi-chunk timelines.** Previously, a multi-chunk Seed Hunt + Latent-Only pass only ever kept the *last* chunk's Stage-1 latent, so a compatible Refine node could only hi-res-fix the final chunk instead of the whole stitched video. Every chunk's own Stage-1 latent is now saved to a small scratch folder as it's generated; `candidate_N_latent` carries a reference to the whole set instead of a single tensor. **Requires a matching Refine node update to actually take advantage of this** — an older Refine build will still only process the last chunk. Falls back to identical single-tensor behavior for a single-chunk timeline, so nothing changes there.
+- **Latent-Only Scouting now works correctly on multi-chunk timelines.** Previously, a multi-chunk Seed Hunt + Latent-Only pass only ever kept the *last* chunk's Stage-1 latent, so Refine could only hi-res-fix the final chunk instead of the whole stitched video. Every chunk's own Stage-1 latent is now saved to a small scratch folder as it's generated; `candidate_N_latent` carries a reference to the whole set instead of a single tensor. Falls back to identical single-tensor behavior for a single-chunk timeline, so nothing changes there. (v2.2.0, above, is what actually lets Refine take advantage of this — the bundled Refine node is the version that knows how to read it.)
 
 ### v2.0.0
 - **Two-stage sampling** (Sampling box, "Enable Two-Stage Sampling"). Runs the first few steps at a lower resolution, upscales the video latent directly (no VAE round-trip), then finishes the remaining steps at full resolution on the same continuous noise schedule. Optional — off keeps the original single-pass behavior exactly as before.
@@ -71,7 +77,7 @@ MiniMax H3 is a strong omni-modal model, but its native inputs are low-level: nu
 - **MiniMax's full six-section reference-mode prompt format** — `subject_definitions`, `summary`, `retention_analysis`, `detailed_description`, `overall_soundscape`, `non_diegetic_music`, `<Subject N>` abstraction layer, fixed-vocabulary retention markers, `[Shot N] At MM:SS.mmm` shot timestamps, and `(Sx)` speaker tags — built automatically from the timeline UI, per MiniMax's own official prompt-writing guide
 - **Multi-speaker CUTs** — pick one or more speaking characters per CUT via chips in the timeline UI; quoted dialogue gets auto-attributed and `(Sx)`-tagged against the right `<Subject N>`, with positional Ref Audio ↔ Ref character voice pairing
 - **Seed Hunt** — an optional toggle that runs the whole timeline 4 times at identical settings, seed only, and outputs all 4 as separate candidate image/audio pairs (see [Seed Hunt, in detail](#seed-hunt-in-detail) below)
-- **`ref_images_used` output** — the exact reference photos used for `<Picture N>` tagging on this run, ready to wire into [Muse Minimax Refine](https://github.com/muse-collective-26/Muse-MiniMax-H3-Refine)'s own `ref_images` input for identity-locked second-pass refining
+- **`ref_images_used` output** — the exact reference photos used for `<Picture N>` tagging on this run, ready to wire into [Muse Minimax Refine](#muse-minimax-refine-bundled)'s own `ref_images` input for identity-locked second-pass refining
 - **Sigma shift controls** exposed directly on the node, applied via the real `MiniMaxH3SigmaShift` node
 - **Image + audio output**, not a bundled video file — wire straight into a standard Video Combine node alongside the rest of your pipeline
 - **`compiled_prompt` output** — the exact, fully-resolved prompt text sent to H3 for every chunk, so you can see precisely what tags and continuity language the node generated
@@ -80,9 +86,10 @@ MiniMax H3 is a strong omni-modal model, but its native inputs are low-level: nu
 
 ## Nodes included
 
-| Node | Description |
-|------|-------------|
-| `MuseMinimaxDirector` | Timeline-based director for MiniMax H3 — the only node in this package |
+| Node | Display name | Description |
+|------|---------------|-------------|
+| `MuseMinimaxDirectorV1_2` | Muse Minimax Director V1.2 (Two-Stage) | Timeline-based director for MiniMax H3 — chunking, prompt compilation, Seed Hunt scouting, continuity |
+| `MuseMinimaxRefineV1_2` | Muse Minimax Refine V1.2 (Latent, Two-Stage) | Companion second-pass node — continues a picked Seed Hunt candidate's own sigma schedule at a higher resolution (see [Muse Minimax Refine (bundled)](#muse-minimax-refine-bundled)) |
 
 ---
 
@@ -90,7 +97,7 @@ MiniMax H3 is a strong omni-modal model, but its native inputs are low-level: nu
 
 - A recent ComfyUI install with the stock `MiniMaxH3ReferenceToVideo` / `MiniMaxH3ImageToVideo` / `MiniMaxH3SigmaShift` nodes available (these ship with ComfyUI core — no separate node pack needed for the model support itself, only for this timeline layer). If this node fails to load with `ModuleNotFoundError: No module named 'comfy_extras.nodes_minimax_h3'` in the console, your ComfyUI core build predates native MiniMax H3 support — update ComfyUI core itself (not this node) and restart.
 - MiniMax H3 model weights, downloaded separately by you — see [Model setup](#model-setup)
-- **[ComfyUI-H3-Motion-Context-MultiRef](https://github.com/seitanism/ComfyUI-H3-Motion-Context-MultiRef)** — only required if you turn on **Enable VAE Re-encode Carry** (chunk continuity). Install via ComfyUI Manager or:
+- **[ComfyUI-H3-Motion-Context-MultiRef](https://github.com/seitanism/ComfyUI-H3-Motion-Context-MultiRef)** — required if you turn on **Enable VAE Re-encode Carry** (Director chunk continuity), and also used by the bundled Refine node when it re-stitches a multi-chunk Latent-Only Scouting candidate. Install via ComfyUI Manager or:
   ```bash
   cd ComfyUI/custom_nodes
   git clone https://github.com/seitanism/ComfyUI-H3-Motion-Context-MultiRef
@@ -154,7 +161,7 @@ You will also need a matching CLIP text encoder, a video VAE, and an audio VAE �
 
 ## Example workflow
 
-A ready-to-load workflow is included at [`workflows/muse_minimax_h3_director_V1.2.json`](workflows/muse_minimax_h3_director_V1.2.json) — demonstrates the two headline features from this version: **Two-Stage Sampling** and **VAE Re-encode Carry** continuity are both switched on, `seed_hunt` is off. Model loaders for both the Reference-to-Video and First/Last-Frame checkpoints are wired up behind a switch (`MuseModelRoute`/`LazySwitchKJ`) so you can flip between them, and a [Muse Minimax Refine](https://github.com/muse-collective-26/Muse-MiniMax-H3-Refine) node is wired up for a second-pass upscale. Reference slots are left empty on purpose so you drop in your own characters and location rather than inheriting someone else's.
+A ready-to-load workflow is included at [`workflows/muse_minimax_h3_director_V1.2.json`](workflows/muse_minimax_h3_director_V1.2.json) — demonstrates the two headline features from this version: **Two-Stage Sampling** and **VAE Re-encode Carry** continuity are both switched on, `seed_hunt` is off. Model loaders for both the Reference-to-Video and First/Last-Frame checkpoints are wired up behind a switch (`MuseModelRoute`/`LazySwitchKJ`) so you can flip between them, and a [Muse Minimax Refine](#muse-minimax-refine-bundled) node is wired up for a second-pass upscale. Reference slots are left empty on purpose so you drop in your own characters and location rather than inheriting someone else's.
 
 It also uses a few extra nodes purely for convenience/performance, on top of what's required above — search ComfyUI Manager for these if they show as missing when you load it:
 
@@ -205,7 +212,7 @@ None of these are needed for `MuseMinimaxDirector` itself to work — only for t
 | `images` | IMAGE | Generated video frames for the main run. **Blocked (not populated) when `seed_hunt` is on** — Seed Hunt is a scouting run, not a final one, so this only ever means "the one real generation" with Seed Hunt off. Use `candidate_1..4` instead when scouting |
 | `audio` | AUDIO | Generated/mixed audio track, same blocking behavior as `images` |
 | `compiled_prompt` | STRING | The exact per-chunk prompt(s) actually sent to H3, including every resolved section, tag, and continuity language. The single best debugging tool for this node — if a render doesn't look right, check this first. Populated regardless of `seed_hunt` |
-| `ref_images_used` | IMAGE | The static `<Picture N>` reference image set actually used on this run's first chunk (character/product photos + background, in H3's own tag order). Reference mode only — empty in First/Last Frame mode. Wire into [Muse Minimax Refine](https://github.com/muse-collective-26/Muse-MiniMax-H3-Refine)'s `ref_images` input for identity-locked refining. Populated regardless of `seed_hunt` |
+| `ref_images_used` | IMAGE | The static `<Picture N>` reference image set actually used on this run's first chunk (character/product photos + background, in H3's own tag order). Reference mode only — empty in First/Last Frame mode. Wire into [Muse Minimax Refine](#muse-minimax-refine-bundled)'s `ref_images` input for identity-locked refining. Populated regardless of `seed_hunt` |
 | `candidate_1_images` / `candidate_1_audio` | IMAGE / AUDIO | Always mirrors `images`/`audio` (the main run), at zero extra cost — populated whether or not `seed_hunt` is on |
 | `candidate_2..4_images` / `candidate_2..4_audio` | IMAGE / AUDIO | The 3 additional scouting passes (seed + N×1,000,003). Only populated when `seed_hunt` is on — empty otherwise |
 
@@ -360,16 +367,35 @@ Each CUT can have one or more speaking characters selected via chips in the time
 
 ## Seed Hunt, in detail
 
-MiniMax H3 generation is expensive enough that finding out a render didn't follow the prompt, after paying full price for it, is a real cost. Seed Hunt runs the entire timeline **4 times** — identical prompt, identical settings, only the seed differs (`seed`, `seed + 1,000,003`, `seed + 2,000,006`, `seed + 3,000,009`) — and outputs all 4 as separate `candidate_1..4_images`/`candidate_1..4_audio` pairs, so you can generate cheaply (low `megapixels`), compare all 4, and only spend real compute refining the one that actually worked.
+MiniMax H3 generation is expensive enough that finding out a render didn't follow the prompt, after paying full price for it, is a real cost. Seed Hunt runs the timeline **up to 4 times** — identical prompt, identical settings, only the seed differs (`seed`, `seed + 1,000,003`, `seed + 2,000,006`, `seed + 3,000,009`) — and outputs each as a separate `candidate_N_images`/`candidate_N_audio` pair (plus `candidate_N_latent` — see below), so you can generate cheaply (low `megapixels`), compare them, and only spend real compute refining the one that actually worked.
 
-With `seed_hunt` off (the default), only `candidate_1` is populated (mirroring the main `images`/`audio` output, at no extra cost) and the main `images`/`audio` outputs work exactly as they do without this toggle at all.
+**Candidate 1 always runs, for free** — it's the main run at your chosen seed regardless of any toggle. Whether 2, 3, or 4 also run is controlled independently, one toggle per candidate (Sampling box, "Seed Hunt" section):
+- **Candidate 2** — one extra pass at `seed + 1,000,003`.
+- **Candidate 3** — one extra pass at `seed + 2,000,006`.
+- **Candidate 4** — one extra pass at `seed + 3,000,009`.
 
-With `seed_hunt` on:
-- The main `images`/`audio` outputs are **intentionally blocked** — they don't mean "a picked result" during scouting, only during a normal single run, so nothing downstream can mistake an unpicked scout for a finished video.
-- All 4 `candidate_N` pairs are populated.
-- Expect roughly 4x the render time of a single run.
+Turn on only the ones you actually want to pay for — 1 total (all off), 2, 3, or the full 4. The moment any one of them is on:
+- The main `images`/`audio` outputs are **intentionally blocked** — they don't mean "a picked result" during scouting, only during a normal single run with nothing extra on, so nothing downstream can mistake an unpicked scout for a finished video.
+- Every candidate that ran gets its own populated `candidate_N_images`/`candidate_N_audio` pair; ones that didn't run stay blocked too.
 
-**Recommended workflow**: set `megapixels` low for the Seed Hunt run (cheap, fast scouting), wire `candidate_1..4_images`/`audio` and `ref_images_used` into [Muse Minimax Refine](https://github.com/muse-collective-26/Muse-MiniMax-H3-Refine), pick the candidate that actually matches the prompt via its button selector, and let Refine do the expensive, high-resolution second pass on just that one.
+**Latent-Only Scouting** (`two_stage_seed_hunt_latent_only`, two-stage sampling only) is a separate, independent toggle — it decides what each pass that runs actually *does* (stop after the cheap Stage 1 instead of also paying for the Stage 2 upscale), not which passes run. Combine it with any of Candidate 2/3/4 freely; neither reads the other.
+
+**Recommended workflow**: set `megapixels` low and turn on however many candidates you want to compare, wire the resulting `candidate_N_latent` outputs (or `candidate_N_images`/`audio`, if Latent-Only Scouting is off) and `ref_images_used` into [Muse Minimax Refine (bundled)](#muse-minimax-refine-bundled), pick the candidate that actually matches the prompt via its button selector, and let Refine do the expensive, high-resolution second pass on just that one.
+
+---
+
+## Muse Minimax Refine (bundled)
+
+`MuseMinimaxRefineV1_2` is the companion second-pass node bundled in this same repository (see [Nodes included](#nodes-included)) — a standalone continuation node, not a modification of the Director. It picks up a chosen Seed Hunt candidate's own sigma schedule exactly where Stage 1 left off and finishes it at a higher resolution — a genuine latent continuation, not a from-pixels img2img re-sample, so nothing about the candidate's own content changes, only its resolution.
+
+**Inputs**, beyond `model`/`clip`/`vae`/`audio_vae`:
+- `prompt` — wire the Director's `compiled_prompt` output. Reused as-is for a single-chunk candidate; ignored for a multi-chunk one (each chunk already carries its own saved prompt — see below).
+- `candidate` — which of the four candidate slots to continue, set by the button selector in the node's own UI. Refuses to run at 0 (none picked) rather than silently defaulting to candidate 1.
+- `candidate_1_latent` … `candidate_4_latent` — wire from the Director's matching outputs. Only meaningful when Latent-Only Scouting was on for that run.
+- `seed` / `steps` / `two_stage_first_pass_steps` — must match what the chosen candidate's own Stage 1 was actually generated with, so the sigma schedule reconstructs correctly and this picks up exactly where Stage 1 left off, not somewhere else on the curve.
+- `ref_images` — the same character/product reference photos that anchored identity in the original candidate (wire the Director's `ref_images_used`). Without this, only the text prompt constrains the pass, and any detail the prompt doesn't spell out is free to drift.
+
+**Multi-chunk candidates**: if the chosen candidate came from a multi-chunk timeline with Latent-Only Scouting on, `candidate_N_latent` carries every chunk, not just one. Refine detects this automatically, refines each chunk in turn — re-anchoring continuity from the previous chunk's own freshly-refined output the same way the Director re-anchors between its own chunks, so the seam stays intact — and hands out one full-length, full-resolution stitched result. A plain single-chunk candidate runs through the same code path with no carry, exactly as it always has.
 
 ---
 
