@@ -65,6 +65,7 @@ import math
 import gc
 import os
 import re
+import tempfile
 
 import av
 import comfy.utils
@@ -1007,6 +1008,28 @@ class MuseMinimaxDirector:
                 "shift_video": ("FLOAT", {"default": 12.0, "min": 0.01, "max": 100.0, "step": 0.01, "advanced": True}),
                 "shift_audio": ("FLOAT", {"default": 3.0, "min": 0.01, "max": 100.0, "step": 0.01, "advanced": True}),
                 "timeline_data": ("STRING", {"default": "{}", "multiline": False}),
+                # Appended after timeline_data (the last pre-existing required widget)
+                # deliberately — ComfyUI restores a saved workflow's widgets_values by
+                # position, not by name, so any new required widget must go at the very
+                # end or every widget after it silently misaligns on old saved workflows.
+                # Replaces the old all-or-nothing seed_hunt toggle with independent
+                # per-candidate control (ported from the proven MuseMinimaxDirector-
+                # SeedHuntToggle-Test node); seed_hunt itself stays put, untouched
+                # position, hidden from the panel, purely so an old workflow that had it
+                # on keeps running all 3 extra passes exactly as before. Orthogonal to
+                # two_stage_seed_hunt_latent_only — that decides what each pass that
+                # runs actually does (stop after Stage 1 or not); these decide which
+                # passes run at all. Neither reads the other.
+                "candidate_2": ("BOOLEAN", {"default": False, "tooltip":
+                    "Runs one extra full pass (identical settings, seed + 1,000,003) and fills the "
+                    "candidate_2 output. Independent of Candidate 3/4 — turn on only the ones you want "
+                    "to pay for."}),
+                "candidate_3": ("BOOLEAN", {"default": False, "tooltip":
+                    "Runs one extra full pass (identical settings, seed + 2,000,006) and fills the "
+                    "candidate_3 output. Independent of Candidate 2/4."}),
+                "candidate_4": ("BOOLEAN", {"default": False, "tooltip":
+                    "Runs one extra full pass (identical settings, seed + 3,000,009) and fills the "
+                    "candidate_4 output. Independent of Candidate 2/3."}),
             },
             "optional": {
                 "model_fl2va": ("MODEL", {"tooltip": "The separate First/Last-Frame checkpoint (not the same "
@@ -1041,7 +1064,8 @@ class MuseMinimaxDirector:
                 seed, seed_hunt, use_prompt_override, steps, sampler_name, scheduler,
                 two_stage_sampling, two_stage_first_pass_steps, two_stage_upscale_factor,
                 two_stage_upscale_method, two_stage_seed_hunt_latent_only, shift_video, shift_audio,
-                timeline_data, model_fl2va=None, prompt_override=None):
+                timeline_data, candidate_2=False, candidate_3=False, candidate_4=False,
+                model_fl2va=None, prompt_override=None):
         tdata = _parse_timeline(timeline_data)
         # Resolved before any reference image is loaded — every character/background/
         # First-Last-Frame image gets fit to this exact resolution via resize_method,
@@ -1095,8 +1119,8 @@ class MuseMinimaxDirector:
         num_chunks = len(buckets)
 
         log.info(
-            "[MuseMinimaxDirector] mode=%s, %dx%d, seed=%d, seed_hunt=%s, %d chunk(s): %s (total %.1fs)",
-            mode, width, height, seed, seed_hunt, num_chunks,
+            "[MuseMinimaxDirector] mode=%s, %dx%d, seed=%d, candidates=%d, %d chunk(s): %s (total %.1fs)",
+            mode, width, height, seed, 1 + sum([candidate_2, candidate_3, candidate_4]), num_chunks,
             ", ".join(f"~{c:.1f}s" for c in chunk_lengths), sum(chunk_lengths),
         )
 
@@ -1192,13 +1216,28 @@ class MuseMinimaxDirector:
             if clip_audio is not None:
                 user_ref_audios.append((clip_audio, entry, ui_idx))
 
+        # Latent-Only Scouting used to only ever keep the LAST chunk's Stage-1 latent
+        # (candidate_N_latent silently dropped every earlier chunk) — fine for a
+        # single-chunk timeline, but on a multi-chunk one it meant Refine could only
+        # ever hi-res-fix the final chunk, never the full stitched video (confirmed
+        # directly: a real 2-chunk refine only produced the last ~15s). Fixed by
+        # saving every chunk's own Stage-1 latent to a small scratch folder on disk
+        # as it's generated, one candidate index at a time — Refine then loads them
+        # back, refines each chunk in order (re-anchoring continuity between them the
+        # same way this node does between its own chunks), and stitches the results
+        # itself. Scoped to a fresh OS temp dir per node execution so it never
+        # collides with another run; Refine deletes it once it's done with it. Only
+        # created when Latent-Only Scouting is actually on — every other path is
+        # unaffected and never touches disk for this.
+        run_scout_dir = tempfile.mkdtemp(prefix="muse_v1_2_scout_") if two_stage_seed_hunt_latent_only else None
+
         # The entire per-chunk build + sample + decode pipeline below only ever
         # depends on `seed` in one place (RandomNoise's noise_seed) — everything
         # else (prompts, reference assembly, conditioning) is identical regardless
         # of seed. Wrapped as a nested function so Seed Hunt can call it multiple
         # times with different seeds, and the single-pass (non-hunt) path is just
         # calling it once — same code, no duplicated logic between the two.
-        def _run_pass(pass_seed):
+        def _run_pass(pass_seed, candidate_idx=0):
             all_images = []
             all_waveform = None
             audio_sample_rate = None
@@ -1924,6 +1963,13 @@ class MuseMinimaxDirector:
 
                 if chunk_stage1_latent is not None:
                     last_chunk_stage1_latent = chunk_stage1_latent
+                    if run_scout_dir is not None:
+                        candidate_dir = os.path.join(run_scout_dir, f"candidate_{candidate_idx}")
+                        os.makedirs(candidate_dir, exist_ok=True)
+                        torch.save(
+                            {"latent": chunk_stage1_latent, "prompt": chunk_prompt},
+                            os.path.join(candidate_dir, f"chunk_{chunk_idx + 1:04d}.pt"),
+                        )
 
                 chunk_images = _unpack_node_result(_execute_comfy_node(VAEDecode, samples=sampled, vae=vae))[0]
                 chunk_audio = _unpack_node_result(_execute_comfy_node(VAEDecodeAudio, samples=sampled, vae=audio_vae))[0]
@@ -2069,9 +2115,26 @@ class MuseMinimaxDirector:
             final_images = torch.cat(all_images, dim=0) if len(all_images) > 1 else all_images[0]
             final_audio = {"waveform": all_waveform, "sample_rate": audio_sample_rate}
 
+            # Latent-Only Scouting, multi-chunk timeline: last_chunk_stage1_latent is
+            # only ever this pass's LAST chunk on its own — real, but incomplete, since
+            # Refine needs every chunk to hi-res-fix the whole thing, not just the
+            # tail. Every chunk was already saved to run_scout_dir above as it was
+            # generated; attach a small marker pointing Refine at that folder (which
+            # chunks, how many, what carry length to re-anchor with) rather than
+            # changing what rides in "samples" itself — a plain single-chunk consumer
+            # that's never heard of this marker still gets exactly what it got before.
+            if run_scout_dir is not None and last_chunk_stage1_latent is not None:
+                bundle_latent = dict(last_chunk_stage1_latent)
+                bundle_latent["_muse_scout_bundle"] = {
+                    "dir": os.path.join(run_scout_dir, f"candidate_{candidate_idx}"),
+                    "chunk_count": len(buckets),
+                    "carry_length": int(vae_reencode_carry_length),
+                }
+                last_chunk_stage1_latent = bundle_latent
+
             return final_images, final_audio, "\n\n".join(compiled_prompts), last_chunk_stage1_latent
 
-        images, audio, compiled_prompt_text, stage1_latent = _run_pass(seed)
+        images, audio, compiled_prompt_text, stage1_latent = _run_pass(seed, candidate_idx=0)
         # candidate_1 always mirrors the main single-pass result, at zero extra cost —
         # so "just refine my one result" keeps working with Seed Hunt left off, exactly
         # like it already does today. candidates 2-4 are the extra scouting passes,
@@ -2081,13 +2144,21 @@ class MuseMinimaxDirector:
         candidate_audio = [audio, None, None, None]
         candidate_latents = [stage1_latent, None, None, None]
 
-        if seed_hunt:
-            log.warning("[MuseMinimaxDirector] Seed Hunt is on — running 3 additional full passes "
-                        "(4 total) at identical settings, different seeds only. Takes ~4x as long as "
-                        "a single run.")
+        # seed_hunt is legacy and hidden from the panel. It is intentionally NOT
+        # consulted here (even though it's still a real widget, kept only so old saved
+        # workflows don't misalign) — if its stored value were ever left on with no
+        # visible control to see or undo it, it would silently force every candidate on.
+        # candidate_2/3/4 are the only things that decide this now.
+        run_candidate = [False, candidate_2, candidate_3, candidate_4]
+        any_candidate = any(run_candidate[1:])
+        if any_candidate:
+            log.warning("[MuseMinimaxDirector] Running %d additional full pass(es) at identical "
+                        "settings, different seeds only.", sum(run_candidate[1:]))
             for i in range(1, 4):
+                if not run_candidate[i]:
+                    continue
                 pass_seed = seed + i * SEED_HUNT_SEED_STRIDE
-                c_images, c_audio, _, c_latent = _run_pass(pass_seed)
+                c_images, c_audio, _, c_latent = _run_pass(pass_seed, candidate_idx=i)
                 candidate_images[i] = c_images
                 candidate_audio[i] = c_audio
                 candidate_latents[i] = c_latent
@@ -2096,18 +2167,18 @@ class MuseMinimaxDirector:
         empty_audio = {"waveform": torch.zeros((1, 1, 0)), "sample_rate": 44100}
 
         # Seed Hunt is a scouting run, not a final one — main images/audio only ever
-        # mean "the one real generation" when Seed Hunt is off. With it on, leaving
-        # them silently equal to candidate_1 invites wiring something downstream
-        # straight to what looks like a finished result when it's really just one of
-        # four unpicked scouts. Blocked (not populated with candidate_1) instead, so
-        # anything wired to them stops cleanly rather than running on the wrong thing.
-        # ExecutionBlocker(message) still fires ComfyUI's own "execution_error" event
-        # (a visible red error toast, confirmed from execution.py's execution_block_cb)
-        # — ExecutionBlocker(None) blocks silently instead; this log line is the only
-        # visible trace, in the console, not a popup.
-        if seed_hunt:
-            log.info("[MuseMinimaxDirector] Seed Hunt is on — main images/audio outputs are blocked "
-                      "(not a picked result). Use candidate_1..4 instead.")
+        # mean "the one real generation" when no extra candidate ran. With one or more
+        # on, leaving them silently equal to candidate_1 invites wiring something
+        # downstream straight to what looks like a finished result when it's really
+        # just one of several unpicked scouts. Blocked (not populated with candidate_1)
+        # instead, so anything wired to them stops cleanly rather than running on the
+        # wrong thing. ExecutionBlocker(message) still fires ComfyUI's own
+        # "execution_error" event (a visible red error toast, confirmed from
+        # execution.py's execution_block_cb) — ExecutionBlocker(None) blocks silently
+        # instead; this log line is the only visible trace, in the console, not a popup.
+        if any_candidate:
+            log.info("[MuseMinimaxDirector] One or more extra candidates ran — main images/audio "
+                      "outputs are blocked (not a picked result). Use candidate_1..4 instead.")
             main_images = ExecutionBlocker(None)
             main_audio = ExecutionBlocker(None)
         else:
