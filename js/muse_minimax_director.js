@@ -22,6 +22,11 @@ const { api } = window.comfyAPI.api;
 
 const MAX_CHARACTER_SLOTS = 9;
 const REF_AV_SLOTS = 3;
+// Floor for a single CUT's typed-in duration. Deliberately small — this only
+// bounds one CUT's own length, not how much room redistributing it needs
+// elsewhere (see _buildCutBlock's duration input, which pulls/gives that
+// difference across every other CUT in the chunk at once).
+const MIN_CUT_SECONDS = 0.3;
 // Taken out of the UI for now — not deleted, just hidden until it's wanted again.
 const SHOW_PROMPT_GEN = false;
 const HIDDEN_WIDGET_NAMES = ["timeline_data"];
@@ -283,7 +288,16 @@ function injectStyles() {
     display: flex; align-items: center; justify-content: space-between; padding: 5px 7px 3px 7px;
     flex-shrink: 0;
   }
-  .mmd-cut-label { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+  .mmd-cut-label { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; display: flex; align-items: center; gap: 3px; }
+  .mmd-cut-duration-input {
+    width: 44px; background: #14141a; border: 1px solid #2a2a35; border-radius: 3px;
+    color: #d4d4dc; font-size: 11px; font-weight: 700; font-family: inherit;
+    padding: 1px 2px; text-align: right; -moz-appearance: textfield;
+  }
+  .mmd-cut-duration-input::-webkit-outer-spin-button,
+  .mmd-cut-duration-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .mmd-cut-duration-input:focus { outline: none; border-color: #4F8EF7; }
+  .mmd-cut-duration-unit { color: #7a7a8c; font-weight: 400; }
   .mmd-cut-actions { display: flex; align-items: center; gap: 5px; color: #5a5a6a; flex-shrink: 0; }
   .mmd-cut-actions svg { display: block; }
   .mmd-cut-del { cursor: pointer; }
@@ -1726,7 +1740,63 @@ class MinimaxTimelineEditor {
     const label = document.createElement("div");
     label.className = "mmd-cut-label";
     label.style.color = color.bar;
-    label.textContent = `CUT ${i + 1} · ~${this._formatDuration(seconds)}`;
+    label.append(`CUT ${i + 1} · `);
+    const otherSegs = chunk.segments.filter((sg, idx) => idx !== i);
+    if (!otherSegs.length) {
+      // Only CUT in the chunk — nothing to trade duration with, so there's no
+      // meaningful "type an exact value" action; show the plain read-only
+      // figure instead of a box that can't actually do anything.
+      label.append(`~${this._formatDuration(seconds)}`);
+    } else {
+      const durationInput = document.createElement("input");
+      durationInput.type = "number";
+      durationInput.className = "mmd-cut-duration-input";
+      durationInput.step = "0.01";
+      durationInput.min = String(MIN_CUT_SECONDS);
+      durationInput.title = "Type this CUT's exact duration in seconds — the difference is redistributed " +
+        "proportionally across every other CUT in this chunk, so the chunk's total length never changes.";
+      durationInput.value = seconds.toFixed(2);
+      durationInput.addEventListener("click", (e) => e.stopPropagation());
+      durationInput.addEventListener("change", () => {
+        const segA = chunk.segments[i];
+        const others = chunk.segments.filter((sg, idx) => idx !== i);
+        if (!segA || !others.length) return;
+        const liveTotalWeight = chunk.segments.reduce((s, sg) => s + (sg.weight || 1), 0);
+        const minWeight = (MIN_CUT_SECONDS / chunkDurSeconds) * liveTotalWeight;
+        const othersTotalWeight = others.reduce((s, sg) => s + (sg.weight || 1), 0);
+        // Worst case for how big segA can grow: every other CUT shrinks all the
+        // way down to its own floor. Used to cap the typed value up front so the
+        // proportional redistribution below never has to fight an impossible ask.
+        const maxSegAWeight = liveTotalWeight - others.length * minWeight;
+        const maxSegASeconds = (maxSegAWeight / liveTotalWeight) * chunkDurSeconds;
+
+        let wanted = parseFloat(durationInput.value);
+        if (!Number.isFinite(wanted)) wanted = seconds;
+        wanted = Math.max(MIN_CUT_SECONDS, Math.min(Math.max(MIN_CUT_SECONDS, maxSegASeconds), wanted));
+
+        const wantedWeight = (wanted / chunkDurSeconds) * liveTotalWeight;
+        const deltaWeight = wantedWeight - (segA.weight || 1);
+        // Positive delta: segA grew, so every other CUT gives up its own
+        // proportional share of that. Negative delta (segA shrank): every
+        // other CUT instead gains its share — this is what lets shrinking one
+        // CUT hand its freed time to the whole rest of the chunk at once,
+        // instead of only its one immediate neighbour.
+        if (othersTotalWeight > 0) {
+          for (const other of others) {
+            const share = (other.weight || 1) / othersTotalWeight;
+            other.weight = Math.max(minWeight, (other.weight || 1) - deltaWeight * share);
+          }
+        }
+        segA.weight = wantedWeight;
+        this.commitChanges();
+        this.renderTimeline();
+      });
+      label.appendChild(durationInput);
+      const unit = document.createElement("span");
+      unit.className = "mmd-cut-duration-unit";
+      unit.textContent = "s";
+      label.appendChild(unit);
+    }
     head.appendChild(label);
 
     const actions = document.createElement("div");

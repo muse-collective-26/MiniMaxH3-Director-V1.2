@@ -16,6 +16,9 @@ This repository bundles **two** ComfyUI nodes — Muse Minimax Director V1.2 and
 
 ## Changelog
 
+### v2.3.0
+- **Type an exact CUT duration.** Each CUT's timeline label now shows an editable box instead of static "~1.5s" text — type any value to 2 decimal places (e.g. `1.54`) instead of being limited to the drag handle's coarser steps. Editing one CUT redistributes the difference proportionally across every other CUT in the chunk at once (not just its immediate neighbour), so a CUT near the end of a long chunk can still free up real room even if its one adjacent neighbour doesn't have much to give. Floor is 0.3s per CUT. A chunk with only one CUT has nothing to trade with, so it stays read-only.
+
 ### v2.2.1
 - **Muse Model Route** is now bundled here too — a tiny utility node used by the example workflow to route the Reference or First/Last-Frame model into the Director's single `model` input depending on mode. It previously wasn't published anywhere, so anyone downloading the example workflow couldn't actually get it — that's fixed now.
 
