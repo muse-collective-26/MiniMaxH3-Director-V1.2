@@ -1665,6 +1665,17 @@ class MinimaxTimelineEditor {
     select.className = "mmd-box-select";
     let opts = widget.options?.values;
     if (!Array.isArray(opts)) opts = Array.isArray(widget.options) ? widget.options : [];
+    // [2026-09-24] Saved value not in the current list (e.g. a model file that was
+    // renamed/removed) — show it as missing instead of letting the browser silently
+    // display the first option. Otherwise the box looks fixed while widget.value is
+    // still the old name, and picking the only real option never fires "change".
+    if (widget.value != null && widget.value !== "" && !(opts || []).includes(widget.value)) {
+      const missing = document.createElement("option");
+      missing.value = widget.value;
+      missing.textContent = `⚠ missing: ${widget.value}`;
+      missing.selected = true;
+      select.appendChild(missing);
+    }
     (opts || []).forEach((v) => {
       const o = document.createElement("option");
       o.value = v; o.textContent = v;

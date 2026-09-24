@@ -234,7 +234,6 @@ It also uses a few extra nodes purely for convenience/performance, on top of wha
 - **KJNodes** (`GetNode`/`SetNode`, `ModelPreviewOverrideKJ`) — used throughout for wiring organization and a model-preview wrapper; the Get/Set nodes are purely a tidiness convenience, safe to trace through and rewire directly if you don't have KJNodes. Also required by the Unified Loader itself for its SageAttention/low-VRAM attention/chunked feed-forward patches
 - **ComfyUI-LayerStyle** (`LayerUtility: PurgeVRAM`) — clears VRAM between preview steps, not required for generation to work
 - **ComfyUI-VideoHelperSuite** (`VHS_VideoCombine`, `VHS_BatchManager`, `VHS_FILENAMES`) — combines the Director's `images`/`audio` outputs into a playable video file
-- **crt-nodes** (`SaveTextWithPath`) — saves the `compiled_prompt` output to a text file for reference; entirely optional
 - **ComfyUI-Easy-Use** (`easy showAnything`) — small status-display boxes showing what the Unified Loader actually selected on the last run
 - **ComfyUI-iTools** (`iToolsPreviewText`) — a text-preview node; swap for any other STRING preview node (e.g. "Show Text" from ComfyUI-Custom-Scripts) if you don't have this one
 - **[ComfyUI-H3-Motion-Context-MultiRef](https://github.com/seitanism/ComfyUI-H3-Motion-Context-MultiRef)** — required for Seed Hunt's raw-latent carry continuity between chunks; see [Requirements](#requirements)

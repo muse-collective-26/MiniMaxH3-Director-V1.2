@@ -1,5 +1,27 @@
 # Claude Changes Log — Muse Minimax Director V1.4 / Refine V2
 
+## 2026-09-24 — Fixed: Director dropdowns hid a missing saved value; example workflow pointed at a moved upscaler file
+
+**Reproduction:** on a fresh RunPod install, the example workflow still referenced
+`minimax_h3_latent_upscaler_3d_fp16.safetensors`. The upscaler's author moved/renamed it on
+Hugging Face (2026-09-17, "Organize checkpoints into versioned release folder") to
+`minimax_h3_latent_upscaler_3d_conv_v1/minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors`
+— byte-identical file (SHA-256 043e5a48…55c2), so the old link 404'd. With only the new file
+installed, the Director's Upscale Model box *displayed* the new file but the node still held
+the old name, so ComfyUI kept flagging a missing model, and re-picking the only option did
+nothing.
+
+**Root cause:** `_selectRow` (js/muse_minimax_director.js) only marks an option selected when
+it equals `widget.value`. A saved value not in the list leaves no option selected, the browser
+shows the first one, and choosing that same option never fires `change`.
+
+**Fix:**
+- `_selectRow` now adds a "⚠ missing: <name>" option, selected, when the saved value isn't in
+  the list — so the box shows the truth, and picking a real file is a real change that saves.
+- Example workflow: Director + Refine upscaler widgets and the Model Links note updated to the
+  new filename/URL (bf16/fp32 links too); removed the optional crt-nodes `SaveTextWithPath`
+  node so the example loads without a missing-node-pack error.
+
 ## 2026-09-08 00:39 BST — Fixed: sentence-level speaker controls weakly attached voice references after dialogue
 
 **Reproduction:** two visible female character references, two distinct Voice Reference
