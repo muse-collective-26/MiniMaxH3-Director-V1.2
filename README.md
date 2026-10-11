@@ -180,6 +180,12 @@ pip install av
 
 ## Installation
 
+### Windows and RunPod installers
+
+See [Installers](Installers/README.md) for **Install-Windows.bat** and
+**Install-RunPod.sh**, which install this public release and the supporting
+custom-node packs used by its example workflow. Models remain separate.
+
 ### Via ComfyUI Manager
 Search for **Muse Minimax Director** and click Install.
 

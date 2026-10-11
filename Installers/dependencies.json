@@ -1,0 +1,14 @@
+[
+  ["MiniMaxH3-Director-V1.2", "muse-collective-26/MiniMaxH3-Director-V1.2", "65dbf0bb5776e445e0e145628a4a7e9322829951"],
+  ["Muse-MiniMax-H3-Unified-Loader", "muse-collective-26/Muse-MiniMax-H3-Unified-Loader", "35ba0fe76bffbb76b037b80e3689810349161e37"],
+  ["Muse-Run-Stats", "muse-collective-26/Muse-Run-Stats", "2466949c90a05fb97291997d91d609ded5313fc1"],
+  ["ComfyUI-H3-Multishot", "jlucasmcrell/ComfyUI-H3-Multishot", "d7d197709fc93c1afb125e3db1dfd4ac0ae28c60"],
+  ["ComfyUI-H3-Motion-Context-MultiRef", "seitanism/ComfyUI-H3-Motion-Context-MultiRef", "87de57ba619297503fa49c9594c0c021d5b0c261"],
+  ["Comfyui_Minimax_h3_latent_Upscaler", "LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler", "d7c01b9011f2e8439493f6c02c29995a27df276f"],
+  ["ComfyUI-VideoHelperSuite", "Kosinkadink/ComfyUI-VideoHelperSuite", "4ee72c065db22c9d96c2427954dc69e7b908444b"],
+  ["ComfyUI-KJNodes", "kijai/ComfyUI-KJNodes", "3f20054214fec9f9234fd3841ae6f1e4287948f6"],
+  ["ComfyUI-GGUF", "city96/ComfyUI-GGUF", "6ea2651e7df66d7585f6ffee804b20e92fb38b8a"],
+  ["ComfyUI_LayerStyle", "chflame163/ComfyUI_LayerStyle", "64f976fec8492ea4930c0e30c32369573189b23d"],
+  ["ComfyUI-Easy-Use", "yolain/ComfyUI-Easy-Use", "67afdc8204683e32549e63b7b02dc006d20441fa"],
+  ["ComfyUI-iTools", "MohammadAboulEla/ComfyUI-iTools", "a8f2fef227ca5b0cb9321c39ac7b874a906b1a5b"]
+]
