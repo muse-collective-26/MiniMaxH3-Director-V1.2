@@ -25,9 +25,124 @@ If it cannot find your Python, run it explicitly, for example:
 
 ## RunPod (Linux x86-64)
 
-Use a pod that already has a working ComfyUI with native MiniMax H3 support.
-Stop ComfyUI while installing, but keep the pod running. Open its terminal.
-For the common `/workspace/ComfyUI` layout:
+### Start here — commands for the video
+
+Keep this GitHub page open beside JupyterLab. Copy each command block below
+into the **RunPod JupyterLab terminal**, then press Enter. You do not need to
+download a ZIP to your own computer or upload an installer from Downloads.
+
+These instructions install the **free Director**, not paid Director V2.
+They use the official RunPod ComfyUI template with ComfyUI at
+`/workspace/runpod-slim/ComfyUI`. Other templates may use different paths.
+
+### 1. Before deployment
+
+- Choose your GPU and the official ComfyUI template. RunPod directs RTX 5090
+  and other Blackwell users to its **CUDA 13.0** template.
+- Attach a **Standard Network Volume before deploying** if you want to retain
+  the installation and models after terminating the pod. Store them under `/workspace`.
+- **200 GB is a starting recommendation, not a tested minimum** for every model
+  combination. Allow more space for multiple models and accumulated outputs.
+- At the current standard rate of $0.07/GB/month, 200 GB costs about $14/month,
+  separate from GPU rental. Check the deployment screen for the current price.
+- Network volumes remain billable when the GPU is not running. Keep account
+  credit available and back up important outputs. Container disk is temporary;
+  a pod's own volume disk survives stopping but not termination.
+- Network volume location limits GPU availability. Check compatibility before
+  creating the volume or deploying the pod.
+
+Sources: [RunPod template](https://github.com/runpod-workers/comfyui-base),
+[network volumes](https://docs.runpod.io/storage/network-volumes),
+[storage types](https://docs.runpod.io/pods/storage/types).
+
+### 2. Open JupyterLab
+
+- Wait until **ComfyUI (8188)** and **JupyterLab (8888)** show Ready.
+- Open **JupyterLab**, then **Terminal** from the Launcher.
+- No SSH key is needed for this method.
+
+### 3. Check Python and CUDA
+
+```bash
+/workspace/runpod-slim/ComfyUI/.venv-cu128/bin/python -c "import torch; print('CUDA:', torch.version.cuda); print('GPU available:', torch.cuda.is_available())"
+```
+
+For the CUDA 13 template, expect `CUDA: 13.0` and `GPU available: True`.
+For the CUDA 12.8 template, expect `CUDA: 12.8` and `GPU available: True`.
+The current official startup script retains the `.venv-cu128` directory name
+for both builds; the CUDA version printed above is what matters.
+If the path does not exist, CUDA differs from your selected template, or GPU
+availability is False, **stop here**. Do not create a replacement environment
+or install into an arbitrary Python. Save the output for troubleshooting.
+
+### 4. Stop ComfyUI, but keep the pod running
+
+Do this with no render running. Do not click the pod's Stop or Terminate button.
+
+```bash
+pkill -TERM -f 'python main.py'
+```
+
+### 5. Download the Director and installer onto the pod
+
+```bash
+cd /workspace/runpod-slim/ComfyUI/custom_nodes && git clone https://github.com/muse-collective-26/MiniMaxH3-Director-V1.2.git
+```
+
+This creates `MiniMaxH3-Director-V1.2` inside the pod's `custom_nodes` folder.
+The installer is included in its `Installers` subfolder. Nothing needs moving.
+
+If that repository folder already exists, **do not clone another copy**. Update
+the existing copy instead:
+
+```bash
+git -C /workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2 pull --ff-only
+```
+
+If Git reports an error or conflicting local changes, stop rather than forcing it.
+
+### 6. Run the installer
+
+```bash
+bash /workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/Installers/Install-RunPod.sh \
+  --comfyui /workspace/runpod-slim/ComfyUI \
+  --python /workspace/runpod-slim/ComfyUI/.venv-cu128/bin/python
+```
+
+- Check the displayed ComfyUI and Python paths.
+- Type **y** when prompted, then wait for completion.
+- If installation reports failure, keep the terminal output and resolve it
+  before continuing. Do not treat an incomplete install as success.
+- This installs nodes and dependencies, **not model weights**.
+
+### 7. Start ComfyUI again
+
+```bash
+cd /workspace/runpod-slim/ComfyUI && .venv-cu128/bin/python main.py --listen 0.0.0.0 --port 8188
+```
+
+Leave the terminal running. Return to **Connect → ComfyUI (8188)** and refresh
+the browser if it was already open.
+
+### 8. Load the workflow and select models
+
+- In JupyterLab, open:
+  `/workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/workflows`.
+- Download `muse_minimax_h3_director_V1.4.json` to your computer.
+- Drag that JSON onto the ComfyUI canvas.
+- Add the required H3 model weights separately and select their actual filenames.
+- Upload your own reference assets and enter a short prompt.
+- Leave DLSS disabled, optional RIFE frames at 0, and use a non-Sage attention
+  option unless those optional components are separately configured.
+- Run a short generation first.
+
+The **workflow JSON** is downloaded to your computer for dragging into the
+browser. The **installer and node code** are downloaded directly onto RunPod
+by the clone command in step 5.
+
+### Other ComfyUI folder layouts
+
+For an existing `/workspace/ComfyUI` layout with an autodetectable Python environment:
 
 ```bash
 cd /workspace/ComfyUI/custom_nodes
