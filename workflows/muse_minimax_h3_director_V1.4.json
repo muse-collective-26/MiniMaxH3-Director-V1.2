@@ -1041,8 +1041,8 @@
       ],
       "title": "Quality",
       "properties": {
-        "cnr_id": "comfyui-workflow-encrypt",
-        "ver": "1.0.0",
+        "cnr_id": "comfyui-easy-use",
+        "ver": "67afdc8204683e32549e63b7b02dc006d20441fa",
         "Node name for S&R": "easy showAnything"
       },
       "widgets_values": [
@@ -1085,8 +1085,8 @@
       ],
       "title": "Status",
       "properties": {
-        "cnr_id": "comfyui-workflow-encrypt",
-        "ver": "1.0.0",
+        "cnr_id": "comfyui-easy-use",
+        "ver": "67afdc8204683e32549e63b7b02dc006d20441fa",
         "Node name for S&R": "easy showAnything"
       },
       "widgets_values": [
@@ -1129,8 +1129,8 @@
       ],
       "title": "Detected VRAM",
       "properties": {
-        "cnr_id": "comfyui-workflow-encrypt",
-        "ver": "1.0.0",
+        "cnr_id": "comfyui-easy-use",
+        "ver": "67afdc8204683e32549e63b7b02dc006d20441fa",
         "Node name for S&R": "easy showAnything"
       },
       "widgets_values": [

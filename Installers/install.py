@@ -68,6 +68,14 @@ def python_candidates(root):
             root.parent / ".venv" / executable, root.parent / "venv" / executable]
 
 
+def select_python(root, explicit=None):
+    # A Linux venv's bin/python is normally a symlink to the system binary.
+    # Resolving it discards the venv and installs into the wrong environment.
+    candidate = Path(explicit).expanduser() if explicit else next(
+        (p for p in python_candidates(root) if p.is_file()), Path(sys.executable))
+    return candidate.absolute()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--comfyui")
@@ -78,8 +86,8 @@ def main():
     args = parser.parse_args()
     root = find_root(args.comfyui)
     if not args.selected_python:
-        selected = Path(args.python_path).expanduser().resolve() if args.python_path else next((p for p in python_candidates(root) if p.is_file()), Path(sys.executable))
-        if selected.resolve() != Path(sys.executable).resolve():
+        selected = select_python(root, args.python_path)
+        if selected != Path(sys.executable).absolute():
             result = subprocess.run([str(selected), str(HERE / "install.py"), *sys.argv[1:], "--selected-python"])
             return result.returncode
     if platform.system() not in ("Windows", "Linux"):

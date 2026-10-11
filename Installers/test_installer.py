@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("muse_installer", Path(__file__).with_name("install.py"))
 installer = importlib.util.module_from_spec(spec)
@@ -40,6 +41,18 @@ class InstallerTests(unittest.TestCase):
 
     def test_origin(self):
         self.assertEqual(installer.normalize_origin("git@github.com:User/Repo.git"), "https://github.com/user/repo")
+
+    def test_explicit_python_preserves_venv_path(self):
+        executable = self.root / '.venv-cu128/bin/python'
+        with patch.object(Path, 'resolve', side_effect=AssertionError('must not dereference venv')):
+            self.assertEqual(installer.select_python(self.root, str(executable)), executable.absolute())
+
+    def test_workflow_easy_use_metadata(self):
+        workflow = json.loads((Path(__file__).parents[1] / 'workflows' / installer.WORKFLOW).read_text(encoding='utf-8'))
+        displays = [n for n in workflow['nodes'] if n['type'] == 'easy showAnything']
+        self.assertEqual(len(displays), 3)
+        for node in displays:
+            self.assertEqual(node['properties']['cnr_id'], 'comfyui-easy-use')
 
     def test_public_only_pins(self):
         rows = json.loads(Path(__file__).with_name("dependencies.json").read_text())
