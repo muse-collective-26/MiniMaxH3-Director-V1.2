@@ -80,7 +80,7 @@ or install into an arbitrary Python. Save the output for troubleshooting.
 Do this with no render running. Do not click the pod's Stop or Terminate button.
 
 ```bash
-pkill -TERM -f 'python main.py'
+pkill -TERM -f '[p]ython.*main.py'
 ```
 
 ### 5. Download the Director and installer onto the pod
@@ -118,7 +118,7 @@ bash /workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/Install
 ### 7. Start ComfyUI again
 
 ```bash
-cd /workspace/runpod-slim/ComfyUI && .venv-cu128/bin/python main.py --listen 0.0.0.0 --port 8188
+cd /workspace/runpod-slim/ComfyUI && .venv-cu128/bin/python main.py --listen 0.0.0.0 --port 8188 --enable-cors-header
 ```
 
 Leave the terminal running. Return to **Connect → ComfyUI (8188)** and refresh
@@ -130,7 +130,7 @@ the browser if it was already open.
   `/workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/workflows`.
 - Download `muse_minimax_h3_director_V1.4.json` to your computer.
 - Drag that JSON onto the ComfyUI canvas.
-- Add the required H3 model weights separately and select their actual filenames.
+- Download the model weights using [Download Models — RunPod](DOWNLOAD-MODELS.md), then select their actual filenames.
 - Upload your own reference assets and enter a short prompt.
 - Leave DLSS disabled, optional RIFE frames at 0, and use a non-Sage attention
   option unless those optional components are separately configured.
