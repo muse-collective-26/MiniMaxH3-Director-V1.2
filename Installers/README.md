@@ -118,7 +118,7 @@ bash /workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/Install
 ### 7. Start ComfyUI again
 
 ```bash
-cd /workspace/runpod-slim/ComfyUI && .venv-cu128/bin/python main.py --listen 0.0.0.0 --port 8188 --enable-cors-header
+bash /workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/Installers/Start-RunPod.sh
 ```
 
 Leave the terminal running. Return to **Connect → ComfyUI (8188)** and refresh
@@ -128,7 +128,7 @@ the browser if it was already open.
 
 - In JupyterLab, open:
   `/workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/workflows`.
-- Download `muse_minimax_h3_director_V1.4.json` to your computer.
+- Download the installer-created `Muse MiniMax Director - RunPod.json` to your computer.
 - Drag that JSON onto the ComfyUI canvas.
 - Download the model weights using [Download Models — RunPod](DOWNLOAD-MODELS.md), then select their actual filenames.
 - Upload your own reference assets and enter a short prompt.
@@ -179,7 +179,11 @@ it does not silently update them. Update old dependencies separately if needed.
 New dependency copies use the revisions in `dependencies.json` (detached Git
 checkouts); existing Git checkouts retain their current branch and changes.
 
-No model weights, LoRAs, DLSS runtime or SageAttention binaries are downloaded.
+H3 model weights, LoRAs, DLSS runtime and SageAttention binaries are not downloaded
+by the node installer. The separate seven-model download command provides the H3
+weights. RunPod installation now includes Ollama and `gemma3:4b` for image analysis;
+Windows installation does not. See [the updated copy/paste guide](README-COPY-PASTE.md)
+for disk requirements, model licence and restarting both services.
 Use a non-Sage attention option unless SageAttention is already configured.
 Optional RIFE seam interpolation is not installed: leave its frame count at 0
 unless you separately install ComfyUI-Frame-Interpolation. No ComfyUI core or

@@ -45,10 +45,16 @@ bash /workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/Install
 Check the displayed paths. Type **y** and press Enter.
 Wait for **Installation finished**. If it reports an error, stop here.
 
+The RunPod installer includes Ollama and the Gemma 3 4B vision model for Analyze.
+That adds about 3.4 GB of model weights plus the Ollama runtime. Both are kept in
+`ComfyUI/.muse-runpod` on your persistent storage. Review the
+[model licence](https://ollama.com/library/gemma3:4b) before confirming installation.
+No hosted API key is required. Port 11435 is local-only; do not expose it in RunPod.
+
 ## 5. Start ComfyUI
 
 ```bash
-cd /workspace/runpod-slim/ComfyUI && .venv-cu128/bin/python main.py --listen 0.0.0.0 --port 8188 --enable-cors-header
+bash /workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/Installers/Start-RunPod.sh
 ```
 
 Wait for **To see the GUI…**. Leave this terminal running.
@@ -62,7 +68,7 @@ In JupyterLab's file browser, open this folder:
 /workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/workflows
 ```
 
-Download **muse_minimax_h3_director_V1.4.json** to your computer, then drag it
+Download **Muse MiniMax Director - RunPod.json** to your computer, then drag it
 onto the ComfyUI canvas. Only the workflow JSON needs downloading to your computer.
 
 ## 7. Download the seven models directly onto RunPod
@@ -82,7 +88,7 @@ Wait for **All 7 selected model files are present**.
 
 This downloads approximately **68 GB** into the correct model folders on the pod.
 No GGUF alternatives or preview models. Actual free space is checked first;
-100 GB total storage must also hold ComfyUI, dependencies and outputs.
+100 GB total storage must also hold ComfyUI, dependencies, Ollama and outputs.
 If interrupted, repeat this block to resume. No reinstall required.
 
 ## 8. Select models and references
@@ -94,3 +100,16 @@ Refresh the browser. Do not start a second ComfyUI process alongside the first.
 
 Upload your own reference images using ComfyUI's upload controls.
 Keep unused LoRA slots disabled. Do not render until all downloads finish.
+
+The RunPod workflow has only the Turbo LoRA selected (Linux path), the two extra
+LoRAs disabled, SageAttention off, and RIFE seam interpolation disabled (0 frames).
+Do not load the Windows example instead. No RIFE installation is required.
+
+Analyze is configured automatically: Ollama, `http://127.0.0.1:11435`, `gemma3:4b`.
+Analyse references before rendering, not at the same time. The analysis request
+unloads its Ollama model afterwards to release memory. First analysis can take
+longer while loading the model. A service/model check is not a full inference test.
+
+When returning after a pod restart, use **step 5** again to start both services.
+Do not repeat the installation or model downloads. This assumes the same persistent
+storage is attached and mounted at the same path. The Windows workflow is unchanged.
