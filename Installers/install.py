@@ -116,10 +116,11 @@ def main():
     print("Protected packages:", protected)
     for name, repo, sha, existing in plan:
         print("KEEP" if existing else "INSTALL", existing or name)
-    print("Existing node folders are NOT updated or overwritten; their requirements are installed.")
+    print("Existing node folders are kept, except the stated RunPod KJNodes compatibility repair; requirements are installed.")
     print("No H3 models, DLSS, SageAttention, ComfyUI updates or renders are included.")
     print("Optional RIFE seam interpolation is not installed; leave seam_interpolation_frames at 0.")
     if args.runpod:
+        print('Incompatible official KJNodes checkouts are updated to the pinned revision if clean; local edits are preserved.')
         print('RunPod includes Ollama and gemma3:4b vision (~3.4 GB plus runtime).')
         print('Stored under ComfyUI/.muse-runpod; loopback only, port 11435.')
         print('Gemma licence: https://ollama.com/library/gemma3:4b — review before confirming.')
@@ -148,6 +149,10 @@ def main():
             shutil.move(str(target), str(destination))
             target = destination
         installed.append(target)
+        if args.runpod and name == 'ComfyUI-KJNodes':
+            import runpod_setup
+            runpod_setup.ensure_kjnodes(target, sha)
+            runpod_setup.configure_previews(target)
     requirements = []
     for target in installed:
         req = target / "requirements.txt"
@@ -167,6 +172,7 @@ def main():
     destination = root / "user/default/workflows/Muse Collective" / WORKFLOW
     if args.runpod:
         destination = destination.with_name(runpod_setup.WORKFLOW)
+        runpod_setup.publish_workflow(source, destination)
     if source.is_file() and not destination.exists():
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)

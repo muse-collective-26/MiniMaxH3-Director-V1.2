@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download the seven selected models for the free Director workflow. No pip needed."""
+"""Download seven generation models and the tiny H3 preview model. No pip needed."""
 import argparse
 import json
 import shutil
@@ -9,6 +9,9 @@ import urllib.request
 from pathlib import Path
 
 MODELS = json.loads(r'''[{"folder":"vae","url":"https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/vae/minimax_h3_video_vae_fp16.safetensors","name":"minimax_h3_video_vae_fp16.safetensors"},{"folder":"vae","url":"https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/vae/minimax_h3_audio_vae_fp32.safetensors","name":"minimax_h3_audio_vae_fp32.safetensors"},{"folder":"diffusion_models","url":"https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors","name":"minimax_h3_fl2va_pruned_int8_convrot.safetensors"},{"folder":"diffusion_models","url":"https://huggingface.co/Kijai/MiniMax-H3-experimental/resolve/main/minimax_h3_fastvideo_vsa_datafree_1300step_4step_int8_convrot.safetensors","name":"minimax_h3_fastvideo_vsa_datafree_1300step_4step_int8_convrot.safetensors"},{"folder":"text_encoders","url":"https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors","name":"qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"},{"folder":"latent_upscale_models","url":"https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler/resolve/main/minimax_h3_latent_upscaler_3d_conv_v1/minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors","name":"minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors"},{"folder":"loras/H3","url":"https://huggingface.co/lightx2v/Minimax-h3-Turbo/resolve/main/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors","name":"minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors"}]''')
+
+MODELS.append({'folder': 'vae_approx', 'name': 'taeh3.safetensors',
+               'url': 'https://huggingface.co/Kijai/MiniMax-H3-TAE/resolve/main/vae_approx/taeh3.safetensors'})
 
 def remote_size(url):
     request = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "Muse-Model-Downloader/1.0"})
@@ -34,7 +37,7 @@ def main():
     if not shutil.which("curl"):
         raise RuntimeError("curl is required but was not found.")
     print("Destination: " + str(root / "models"), flush=True)
-    print("Includes ONLY the seven selected standard models. No GGUF alternatives or previews.")
+    print("Includes seven selected generation models plus the tiny H3 preview model. No GGUF alternatives.")
     print("Model licences remain those of their publishers. Checking all URLs before downloading...", flush=True)
     plan = []
     remaining = 0
@@ -75,7 +78,7 @@ def main():
         if target.exists():
             raise RuntimeError("Destination appeared during download; not replacing it: " + str(target))
         partial.rename(target)
-    print("\nAll 7 selected model files are present (file sizes checked; not a render test).")
+    print("\nAll 8 selected model files are present (file sizes checked; not a render test).")
     print("Refresh ComfyUI model lists, or restart ComfyUI if filenames are not visible.")
     print("Select your model filenames. Keep unused optional LoRA slots disabled.")
 

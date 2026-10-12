@@ -26,20 +26,77 @@ def workflow(source):
         changes = {}
         if node['type'] == 'MuseMiniMaxH3UnifiedLoader':
             changes = {'sage_attention': False, 'lora_2': '(disabled)',
-                       'lora_3': '(disabled)', 'lora_1': named['lora_1'].replace('\\', '/')}
+                       'lora_3': '(disabled)', 'lora_1': named['lora_1'].replace('\\', '/'),
+                       'models_to_load': 'Both / Mixed', 'pinned_memory_cap': '10 GB'}
         elif node['type'] == 'MuseMinimaxDirectorV1_4':
             timeline = json.loads(named['timeline_data'])
             timeline.update(analyze_provider='ollama', analyze_base_url=URL, analyze_model=MODEL,
                             prompt_gen_provider='ollama', prompt_gen_base_url=URL, prompt_gen_model=MODEL)
             changes = {'seam_interpolation_frames': 0, 'timeline_data': json.dumps(timeline)}
         if changes:
+            node.setdefault('properties', {})['muse_runpod_named_widgets'] = True
             # This supplied export stores named and positional widgets in the same order.
             if list(named.values()) != node['widgets_values']:
                 raise RuntimeError('Workflow widget layout changed; refusing positional guesses.')
             for key, value in changes.items():
-                node['widgets_values'][list(named).index(key)] = value
+                if key in named:
+                    node['widgets_values'][list(named).index(key)] = value
+                else:
+                    node['widgets_values'].append(value)
                 named[key] = value
     return result
+
+def ensure_kjnodes(target, sha):
+    """Upgrade only an incompatible, clean, official Git checkout."""
+    def git(*args):
+        return subprocess.run(['git', '-C', str(target), *args], check=True,
+                              capture_output=True, text=True).stdout.strip()
+    def compatible():
+        module = target / 'nodes/minimax_nodes.py'
+        init = target / '__init__.py'
+        names = ('MiniMaxLowVRAMAttention', 'MiniMaxChunkFeedForward')
+        return all(p.is_file() and all(n in p.read_text(encoding='utf8') for n in names)
+                   for p in (module, init))
+    if compatible():
+        return
+    origin = git('remote', 'get-url', 'origin').lower().removesuffix('.git').rstrip('/')
+    if origin not in ('https://github.com/kijai/comfyui-kjnodes', 'git@github.com:kijai/comfyui-kjnodes'):
+        raise RuntimeError('Incompatible KJNodes is not an official checkout; left untouched.')
+    if git('status', '--porcelain'):
+        raise RuntimeError('Incompatible KJNodes has local changes; left untouched. Resolve them before rerunning.')
+    previous = git('rev-parse', 'HEAD')
+    print('Updating incompatible KJNodes from', previous, 'to', sha)
+    git('fetch', 'origin', sha)
+    git('checkout', '--detach', sha)
+    if not compatible():
+        raise RuntimeError('KJNodes MiniMax source check failed after update.')
+
+def publish_workflow(source, destination):
+    """Refresh the installed example while retaining any previous saved copy."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists() and destination.read_bytes() != source.read_bytes():
+        import hashlib
+        digest = hashlib.sha256(destination.read_bytes()).hexdigest()[:12]
+        backup = destination.with_name(destination.stem + '-saved-' + digest + '.json')
+        if not backup.exists():
+            shutil.copy2(destination, backup)
+    shutil.copy2(source, destination)
+
+def configure_previews(target):
+    """Use KJ's existing WebP preview path on RunPod; final output is unaffected."""
+    path = target / 'nodes/preview_override_node.py'
+    text = path.read_text(encoding='utf8')
+    old = '_NVENC_AVAILABLE = _HAS_NVENC and not _csp_blocks_video()'
+    new = '_NVENC_AVAILABLE = False  # Muse RunPod: use animated WebP previews'
+    if new in text:
+        return
+    if text.count(old) != 1:
+        raise RuntimeError('KJ preview layout changed; refusing an unverified edit.')
+    text = text.replace(old, new).replace(
+        '--disable-api-nodes blocks blob: video, using WebP for animated previews.',
+        'Muse RunPod uses WebP for animated previews; final video encoding is unchanged.')
+    compile(text, str(path), 'exec')
+    path.write_text(text, encoding='utf8')
 
 def api(path, data=None):
     request = urllib.request.Request(URL + path,

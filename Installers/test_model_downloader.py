@@ -11,8 +11,8 @@ spec.loader.exec_module(d)
 
 class DownloaderTests(unittest.TestCase):
     def test_manifest(self):
-        self.assertEqual(len(d.MODELS), 7)
-        self.assertEqual(len({(m['folder'], m['name']) for m in d.MODELS}), 7)
+        self.assertEqual(len(d.MODELS), 8)
+        self.assertEqual(len({(m['folder'], m['name']) for m in d.MODELS}), 8)
         self.assertTrue(all(m['url'].startswith('https://') for m in d.MODELS))
 
     def run_plan(self, root, check=True):
@@ -46,7 +46,7 @@ class DownloaderTests(unittest.TestCase):
             a,b,c = self.run_plan(root, False)
             with a,b,c,patch('builtins.input', return_value='y'),patch.object(d.subprocess, 'run', side_effect=fake_curl) as run:
                 d.main()
-                self.assertEqual(run.call_count, 6)
+            self.assertEqual(run.call_count, 7)
             self.assertTrue(all(d.destination(root,m).stat().st_size == 10 for m in d.MODELS))
             self.assertEqual(list(root.rglob('*.part')), [])
 

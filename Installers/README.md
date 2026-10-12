@@ -164,6 +164,22 @@ Check that the displayed Python is the one your ComfyUI launch command uses.
 RunPod container/root environments are supported; ARM64/DGX Spark is not covered.
 Use `--check` to inspect the plan without installing or downloading anything.
 
+## RunPod compatibility repairs
+
+RunPod now checks KJNodes for both MiniMax memory optimisation components.
+An incompatible, clean official Git checkout is updated to the pinned revision;
+modified or non-Git incompatible copies stop with an explanation, not a destructive reset.
+KJ animated previews use WebP on RunPod to avoid unavailable NVENC sessions.
+This is a small, explicit local modification to KJ's preview module; it does not
+change final video encoding. Rerunning the installer is supported.
+
+The RunPod example restores settings by name, includes valid memory/model-selection
+defaults, and configures Ollama on port 11435 with gemma3:4b. The installed example
+is refreshed on reinstall; any differing previous copy is retained under a
+`-saved-` filename. Open the fresh **Muse MiniMax Director - RunPod** entry.
+The model download step includes seven generation models plus the tiny H3 preview
+model. The copy/paste steps are unchanged; no manual repair commands are required.
+
 ## After installation
 
 Open `workflows/muse_minimax_h3_director_V1.4.json` from this repository. Where
@@ -175,12 +191,12 @@ The installer includes the Director/Refine package, Unified Loader, Run Stats,
 H3 Multishot, Motion Context MultiRef, H3 latent-upscaler nodes, VideoHelperSuite,
 KJNodes, GGUF, LayerStyle, Easy Use and iTools. It installs their Python
 requirements into the displayed environment. Existing node folders are kept;
-it does not silently update them. Update old dependencies separately if needed.
+except for the explicit RunPod KJNodes repair described above.
 New dependency copies use the revisions in `dependencies.json` (detached Git
 checkouts); existing Git checkouts retain their current branch and changes.
 
 H3 model weights, LoRAs, DLSS runtime and SageAttention binaries are not downloaded
-by the node installer. The separate seven-model download command provides the H3
+by the node installer. The separate model download command provides the H3
 weights. RunPod installation now includes Ollama and `gemma3:4b` for image analysis;
 Windows installation does not. See [the updated copy/paste guide](README-COPY-PASTE.md)
 for disk requirements, model licence and restarting both services.

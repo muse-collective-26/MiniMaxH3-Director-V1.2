@@ -62,16 +62,11 @@ Open RunPod → your pod → Connect → ComfyUI. Press Ctrl+F5 if already open.
 
 ## 6. Load the workflow
 
-In JupyterLab's file browser, open this folder:
+In ComfyUI, open **Workflows → Muse Collective → Muse MiniMax Director - RunPod**.
+The installer puts it there automatically. No download or dragging is needed.
+Use this RunPod example, not the standard V1.4 example or an older saved copy.
 
-```text
-/workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/workflows
-```
-
-Download **Muse MiniMax Director - RunPod.json** to your computer, then drag it
-onto the ComfyUI canvas. Only the workflow JSON needs downloading to your computer.
-
-## 7. Download the seven models directly onto RunPod
+## 7. Download the models directly onto RunPod
 
 Open a **NEW** JupyterLab terminal: File → New → Terminal.
 Do not paste this into the terminal still running ComfyUI.
@@ -84,10 +79,11 @@ curl -fL --retry 3 -o Download-Models-RunPod.py https://raw.githubusercontent.co
 ```
 
 Check the space summary. Type **y** and press Enter.
-Wait for **All 7 selected model files are present**.
+Wait for **All 8 selected model files are present**.
 
 This downloads approximately **68 GB** into the correct model folders on the pod.
-No GGUF alternatives or preview models. Actual free space is checked first;
+Includes the seven generation models plus the small `taeh3.safetensors` preview model.
+No GGUF alternatives. Actual free space is checked first;
 100 GB total storage must also hold ComfyUI, dependencies, Ollama and outputs.
 If interrupted, repeat this block to resume. No reinstall required.
 
