@@ -54,6 +54,9 @@ stop the update rather than being overwritten. No extra installation step is nee
 The known RunPod template snapshot `700a8f6` has unrelated Git history. For that
 specific clean snapshot, the installer retains its commit in a recovery ref and
 switches to the tested revision without forcing or overwriting ignored files.
+If template example/config files conflict, only those exact files are moved into
+`ComfyUI/.muse-runpod/core-file-backups/` before switching. Their location is
+printed. Downloaded models and personal workflows are not removed.
 This source/dependency check is not a guarantee of RunPod render quality.
 
 The RunPod installer includes Ollama and the Gemma 3 4B vision model for Analyze.

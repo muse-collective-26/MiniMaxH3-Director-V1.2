@@ -94,12 +94,16 @@ class CoreTests(unittest.TestCase):
             old = git('rev-parse', 'HEAD')
             git('checkout', '--orphan', 'upstream')
             self.install_fixture(root)
+            (root / 'models').mkdir()
+            (root / 'models/template.yaml').write_text('upstream config')
             (root / 'main.py').write_text('# target core\n')
             git('add', '.')
+            git('add', '-f', 'models/template.yaml')
             git('commit', '-m', 'unrelated upstream root')
             target = git('rev-parse', 'HEAD')
             git('checkout', '--detach', old)
-            (root / 'models').mkdir()
+            (root / 'models').mkdir(exist_ok=True)
+            (root / 'models/template.yaml').write_text('original template config')
             (root / 'models/test.bin').write_bytes(b'keep model')
             (root / 'personal-workflow.json').write_text('keep workflow')
             def run(args, **kwargs):
@@ -116,6 +120,10 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(git('rev-parse', 'refs/muse-core-before/' + old), old)
             self.assertEqual((root / 'models/test.bin').read_bytes(), b'keep model')
             self.assertEqual((root / 'personal-workflow.json').read_text(), 'keep workflow')
+            self.assertEqual((root / 'models/template.yaml').read_text(), 'upstream config')
+            saved = list((root / '.muse-runpod/core-file-backups').glob('*/models/template.yaml'))
+            self.assertEqual(len(saved), 1)
+            self.assertEqual(saved[0].read_text(), 'original template config')
 
 
 if __name__ == '__main__':

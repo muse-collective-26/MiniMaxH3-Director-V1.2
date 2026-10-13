@@ -211,6 +211,10 @@ Exception: the known clean RunPod snapshot `700a8f6` is retained in a Git recove
 ref and switched to the tested revision with `--no-overwrite-ignore`; its history
 is unrelated to upstream, so a fast-forward is impossible. Unknown divergent
 histories still stop. Models and user workflows are not deleted.
+Exact untracked/ignored file collisions with the target core are preserved under
+`.muse-runpod/core-file-backups/` before the template switch. No directory-wide
+cleanup is used. If checkout fails, moved files are restored where safe; any
+remaining preserved files stay in the printed backup location.
 Core requirements are included on RunPod, including retries after an interrupted
 install. Windows core is not updated. PyTorch-family packages remain pinned;
 conflicting requirements stop installation instead of replacing CUDA/PyTorch.

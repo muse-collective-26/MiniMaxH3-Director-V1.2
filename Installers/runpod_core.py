@@ -3,6 +3,7 @@ import argparse
 import importlib.metadata
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import tempfile
 
@@ -58,8 +59,46 @@ def ensure_core(root):
         recovery = 'refs/muse-core-before/' + previous
         git('update-ref', recovery, previous)
         print('Retained original core at', recovery)
-        # No force: refuse collisions with untracked AND ignored user files.
-        git('checkout', '--detach', '--no-overwrite-ignore', CORE_REVISION)
+        # Template images can ship upstream example/config files as ignored or
+        # untracked files. Preserve only exact target-file collisions, not folders.
+        tracked = set(git('ls-files', '-z').split('\0'))
+        target_files = git('ls-tree', '-r', '--name-only', '-z', CORE_REVISION).split('\0')
+        collisions = []
+        for relative in target_files:
+            if not relative or relative in tracked:
+                continue
+            path = root / relative
+            if not path.exists() and not path.is_symlink():
+                continue
+            if (path.is_symlink() or not path.is_file()
+                    or root.resolve() not in path.resolve().parents
+                    or any(p.is_symlink() for p in path.parents if p != root and root in p.parents)):
+                raise RuntimeError('Unsafe core file collision; left untouched: ' + relative)
+            collisions.append((relative, path))
+        moved = []
+        backup = None
+        try:
+            if collisions:
+                backup_parent = root / '.muse-runpod/core-file-backups'
+                if root.resolve() not in backup_parent.resolve().parents:
+                    raise RuntimeError('Core backup directory escapes ComfyUI; no files moved.')
+                backup_parent.mkdir(parents=True, exist_ok=True)
+                backup = Path(tempfile.mkdtemp(prefix='before-' + previous[:12] + '-', dir=backup_parent))
+                print('Preserving', len(collisions), 'conflicting template files in', backup, flush=True)
+                for relative, path in collisions:
+                    destination = backup / relative
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(path), str(destination))
+                    moved.append((path, destination))
+            # Still refuse other collisions; never force overwrites or reset.
+            git('checkout', '--detach', '--no-overwrite-ignore', CORE_REVISION)
+        except Exception:
+            for path, saved in reversed(moved):
+                if not path.exists() and not path.is_symlink():
+                    shutil.move(str(saved), str(path))
+            if backup:
+                print('Update stopped. Unrestored preserved files, if any, remain at', backup)
+            raise
     else:
         # Unknown divergent histories still stop rather than switching arbitrarily.
         git('merge', '--ff-only', CORE_REVISION)
