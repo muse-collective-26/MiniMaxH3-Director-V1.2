@@ -51,6 +51,9 @@ An older, clean official core is fast-forwarded to revision
 audio test. Compatible cores are kept. Core requirements are installed with the
 existing PyTorch/CUDA packages pinned. Local core edits or divergent histories
 stop the update rather than being overwritten. No extra installation step is needed.
+The known RunPod template snapshot `700a8f6` has unrelated Git history. For that
+specific clean snapshot, the installer retains its commit in a recovery ref and
+switches to the tested revision without forcing or overwriting ignored files.
 This source/dependency check is not a guarantee of RunPod render quality.
 
 The RunPod installer includes Ollama and the Gemma 3 4B vision model for Analyze.

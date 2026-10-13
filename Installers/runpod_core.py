@@ -8,6 +8,8 @@ import tempfile
 
 # Exact core used by the successful local two-chunk audio test.
 CORE_REVISION = '0df64eb242b7c5759c3e86afd5d1846d923b1033'
+# Observed RunPod template snapshot: full checkout, but unrelated upstream history.
+TEMPLATE_SNAPSHOTS = {'700a8f6669607a599c1834723f4c006418b5e3fe'}
 REQUIRED = {
     'comfy/model_base.py': ('model_type=ModelType.FLOW_AV', 'def audio_scale(',
                             'def _scale_audio_slice(', 'payload["audio_scale"]'),
@@ -51,8 +53,16 @@ def ensure_core(root):
     previous = git('rev-parse', 'HEAD')
     print('Updating ComfyUI audio support:', previous, '->', CORE_REVISION)
     git('fetch', 'origin', CORE_REVISION)
-    # A divergent history or an untracked-file collision stops safely, without force/reset.
-    git('merge', '--ff-only', CORE_REVISION)
+    if previous in TEMPLATE_SNAPSHOTS:
+        # Retain the template commit even when its HEAD was already detached.
+        recovery = 'refs/muse-core-before/' + previous
+        git('update-ref', recovery, previous)
+        print('Retained original core at', recovery)
+        # No force: refuse collisions with untracked AND ignored user files.
+        git('checkout', '--detach', '--no-overwrite-ignore', CORE_REVISION)
+    else:
+        # Unknown divergent histories still stop rather than switching arbitrarily.
+        git('merge', '--ff-only', CORE_REVISION)
     missing = missing_support(root)
     if missing:
         raise RuntimeError('ComfyUI audio support verification failed: ' + ', '.join(missing))

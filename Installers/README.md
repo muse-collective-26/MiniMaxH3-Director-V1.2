@@ -207,6 +207,10 @@ An incompatible clean official checkout is fast-forwarded to
 `0df64eb242b7c5759c3e86afd5d1846d923b1033`, the core used by the successful local
 two-chunk audio test. Compatible cores are retained; local core edits, unknown
 origins and divergent histories stop the repair without forced changes.
+Exception: the known clean RunPod snapshot `700a8f6` is retained in a Git recovery
+ref and switched to the tested revision with `--no-overwrite-ignore`; its history
+is unrelated to upstream, so a fast-forward is impossible. Unknown divergent
+histories still stop. Models and user workflows are not deleted.
 Core requirements are included on RunPod, including retries after an interrupted
 install. Windows core is not updated. PyTorch-family packages remain pinned;
 conflicting requirements stop installation instead of replacing CUDA/PyTorch.

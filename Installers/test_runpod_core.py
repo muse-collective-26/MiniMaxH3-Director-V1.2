@@ -28,7 +28,7 @@ class CoreTests(unittest.TestCase):
             (root / 'comfy/model_sampling.py').write_text('class ModelSamplingDiscreteFlow: pass')
             self.assertEqual(core.missing_support(root), ['comfy/model_sampling.py'])
 
-    def exercise(self, origin='https://github.com/Comfy-Org/ComfyUI.git', dirty='', divergent=False, broken=False):
+    def exercise(self, origin='https://github.com/Comfy-Org/ComfyUI.git', dirty='', divergent=False, broken=False, snapshot=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             calls = []
@@ -38,8 +38,8 @@ class CoreTests(unittest.TestCase):
                 result = ''
                 if cmd[0] == 'remote': result = origin
                 if cmd[0] == 'status': result = dirty
-                if cmd[0] == 'rev-parse': result = 'old'
-                if cmd[0] == 'merge':
+                if cmd[0] == 'rev-parse': result = next(iter(core.TEMPLATE_SNAPSHOTS)) if snapshot else 'old'
+                if cmd[0] in ('merge', 'checkout'):
                     if divergent: return subprocess.CompletedProcess(args, 1, '', 'Not possible to fast-forward')
                     if not broken: self.install_fixture(root)
                 return subprocess.CompletedProcess(args, 0, result, '')
@@ -70,6 +70,52 @@ class CoreTests(unittest.TestCase):
 
     def test_post_update_validation(self):
         self.exercise(broken=True)
+
+    def test_known_template_retained_before_safe_switch(self):
+        calls = self.exercise(snapshot=True)
+        old = next(iter(core.TEMPLATE_SNAPSHOTS))
+        retained = ['update-ref', 'refs/muse-core-before/' + old, old]
+        switch = ['checkout', '--detach', '--no-overwrite-ignore', core.CORE_REVISION]
+        self.assertLess(calls.index(retained), calls.index(switch))
+        self.assertFalse(any(c[0] in ('merge', 'reset', 'clean') for c in calls))
+
+    def test_real_git_unrelated_history_preserves_user_files(self):
+        real_run = subprocess.run
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            def git(*args):
+                return real_run(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                                 '-C', str(root), *args], check=True, capture_output=True, text=True).stdout.strip()
+            git('init')
+            (root / '.gitignore').write_text('models/\n')
+            (root / 'main.py').write_text('# old core\n')
+            git('add', '.')
+            git('commit', '-m', 'template root')
+            old = git('rev-parse', 'HEAD')
+            git('checkout', '--orphan', 'upstream')
+            self.install_fixture(root)
+            (root / 'main.py').write_text('# target core\n')
+            git('add', '.')
+            git('commit', '-m', 'unrelated upstream root')
+            target = git('rev-parse', 'HEAD')
+            git('checkout', '--detach', old)
+            (root / 'models').mkdir()
+            (root / 'models/test.bin').write_bytes(b'keep model')
+            (root / 'personal-workflow.json').write_text('keep workflow')
+            def run(args, **kwargs):
+                if args[3] == 'remote':
+                    return subprocess.CompletedProcess(args, 0, 'https://github.com/Comfy-Org/ComfyUI.git', '')
+                if args[3] == 'fetch':
+                    return subprocess.CompletedProcess(args, 0, '', '')  # target already fetched in fixture
+                return real_run(args, **kwargs)
+            with patch.object(core, 'CORE_REVISION', target), \
+                 patch.object(core, 'TEMPLATE_SNAPSHOTS', {old}), \
+                 patch.object(core.subprocess, 'run', side_effect=run):
+                core.ensure_core(root)
+            self.assertEqual(git('rev-parse', 'HEAD'), target)
+            self.assertEqual(git('rev-parse', 'refs/muse-core-before/' + old), old)
+            self.assertEqual((root / 'models/test.bin').read_bytes(), b'keep model')
+            self.assertEqual((root / 'personal-workflow.json').read_text(), 'keep workflow')
 
 
 if __name__ == '__main__':
