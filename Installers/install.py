@@ -99,7 +99,7 @@ def main():
         raise RuntimeError("This RunPod installer targets x86-64, not ARM64/DGX Spark. No files changed.")
     if not shutil.which("git"):
         raise RuntimeError("Git is required. Install Git before continuing.")
-    if not (root / "comfy_extras/nodes_minimax_h3.py").is_file():
+    if not args.runpod and not (root / "comfy_extras/nodes_minimax_h3.py").is_file():
         raise RuntimeError("This ComfyUI lacks native H3 support. Update ComfyUI separately first.")
     # Preserve the working CUDA/PyTorch installation, including CUDA build suffixes.
     protected = {}
@@ -117,9 +117,12 @@ def main():
     for name, repo, sha, existing in plan:
         print("KEEP" if existing else "INSTALL", existing or name)
     print("Existing node folders are kept, except the stated RunPod KJNodes compatibility repair; requirements are installed.")
-    print("No H3 models, DLSS, SageAttention, ComfyUI updates or renders are included.")
+    print("No H3 models, DLSS, SageAttention or renders are included.")
     print("Optional RIFE seam interpolation is not installed; leave seam_interpolation_frames at 0.")
     if args.runpod:
+        import runpod_core
+        print('RunPod checks ComfyUI FLOW_AV audio support; incompatible clean official cores are fast-forwarded to', runpod_core.CORE_REVISION)
+        print('Core requirements are installed with the existing CUDA/PyTorch packages protected.')
         print('Incompatible official KJNodes checkouts are updated to the pinned revision if clean; local edits are preserved.')
         print('RunPod includes Ollama and gemma3:4b vision (~3.4 GB plus runtime).')
         print('Stored under ComfyUI/.muse-runpod; loopback only, port 11435.')
@@ -135,6 +138,8 @@ def main():
     print("Download/log staging folder:", stage)
     constraints = stage / "constraints.txt"
     constraints.write_text("\n".join(f"{key}=={value}" for key, value in protected.items()) + "\n", encoding="utf-8")
+    if args.runpod:
+        runpod_core.ensure_core(root)
     installed = []
     for name, repo, sha, existing in plan:
         target = existing
@@ -153,7 +158,7 @@ def main():
             import runpod_setup
             runpod_setup.ensure_kjnodes(target, sha)
             runpod_setup.configure_previews(target)
-    requirements = []
+    requirements = ['-r', str(root / 'requirements.txt')] if args.runpod else []
     for target in installed:
         req = target / "requirements.txt"
         if req.is_file():

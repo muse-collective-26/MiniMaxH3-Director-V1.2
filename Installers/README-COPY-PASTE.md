@@ -45,6 +45,14 @@ bash /workspace/runpod-slim/ComfyUI/custom_nodes/MiniMaxH3-Director-V1.2/Install
 Check the displayed paths. Type **y** and press Enter.
 Wait for **Installation finished**. If it reports an error, stop here.
 
+This same install step checks ComfyUI's MiniMax audio-sampling support (FLOW_AV).
+An older, clean official core is fast-forwarded to revision
+`0df64eb242b7c5759c3e86afd5d1846d923b1033`, used by the successful local two-chunk
+audio test. Compatible cores are kept. Core requirements are installed with the
+existing PyTorch/CUDA packages pinned. Local core edits or divergent histories
+stop the update rather than being overwritten. No extra installation step is needed.
+This source/dependency check is not a guarantee of RunPod render quality.
+
 The RunPod installer includes Ollama and the Gemma 3 4B vision model for Analyze.
 That adds about 3.4 GB of model weights plus the Ollama runtime. Both are kept in
 `ComfyUI/.muse-runpod` on your persistent storage. Review the

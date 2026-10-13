@@ -201,10 +201,15 @@ weights. RunPod installation now includes Ollama and `gemma3:4b` for image analy
 Windows installation does not. See [the updated copy/paste guide](README-COPY-PASTE.md)
 for disk requirements, model licence and restarting both services.
 Use a non-Sage attention option unless SageAttention is already configured.
-Optional RIFE seam interpolation is not installed: leave its frame count at 0
-unless you separately install ComfyUI-Frame-Interpolation. No ComfyUI core or
-PyTorch-family upgrade is performed. Conflicting Python requirements stop the
-installer instead of replacing the installed PyTorch versions.
+The RunPod workflow leaves seam interpolation disabled (0 frames).
+RunPod installation checks for MiniMax FLOW_AV audio sampling in ComfyUI core.
+An incompatible clean official checkout is fast-forwarded to
+`0df64eb242b7c5759c3e86afd5d1846d923b1033`, the core used by the successful local
+two-chunk audio test. Compatible cores are retained; local core edits, unknown
+origins and divergent histories stop the repair without forced changes.
+Core requirements are included on RunPod, including retries after an interrupted
+install. Windows core is not updated. PyTorch-family packages remain pinned;
+conflicting requirements stop installation instead of replacing CUDA/PyTorch.
 
 Installer checks are not a GPU render test. Verify a short generation on your
 RunPod template before recording the installation video. A dependency failure
